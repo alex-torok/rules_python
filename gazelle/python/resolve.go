@@ -235,9 +235,11 @@ func (py *Resolver) Resolve(
 								}
 							}
 							if len(sameRootMatches) != 1 {
+                                                                     targetListFromResults(filteredMatches), moduleName, mod.LineNumber, mod.Filepath)
 								err := fmt.Errorf(
-									"multiple targets (%s) may be imported with %q at line %d in %q "+
-										"- this must be fixed using the \"gazelle:resolve\" directive",
+									"multiple targets (%[1]s) may be imported with %[2]q at line %[3]d in %[4]q. Possible solutions:\n"+
+									"\t1. Disambiguate the above multiple targets by removing duplicate srcs entries.\n"+
+									"\t2. Use the \"# gazelle:resolve py %[2]s TARGET_LABEL\" build file directive to resolve to one of the above targets.\n",
 									targetListFromResults(filteredMatches), moduleName, mod.LineNumber, mod.Filepath)
 								errs = append(errs, err)
 								continue POSSIBLE_MODULE_LOOP
