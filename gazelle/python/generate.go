@@ -487,6 +487,35 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 		os.Exit(1)
 	}
 
+	dirsToIndex := map[string]struct{}{}
+	for _, r := range result.Gen {
+		modulesRaw := r.PrivateAttr(config.GazelleImportsKey)
+		modules := modulesRaw.(*treeset.Set)
+		it := modules.Iterator()
+		for it.Next() {
+			mod := it.Value().(module)
+			currentDir := ""
+			parts := strings.Split(mod.Name, ".")
+			for i := range parts {
+				if i == 0 {
+					currentDir = parts[i]
+				} else {
+					currentDir = currentDir + "/" + parts[i]
+				}
+				dirsToIndex[currentDir] = struct{}{}
+			}
+		}
+	}
+
+	dirsToIndex[""] = struct{}{}
+
+	toIndex := make([]string, 0, len(dirsToIndex))
+	for dir := range dirsToIndex {
+		toIndex = append(toIndex, dir)
+	}
+
+	result.PackagesToIndex = toIndex
+
 	return result
 }
 
