@@ -43,7 +43,8 @@ A brief description of the categories of changes:
 * (bzlmod) Properly handle relative path URLs in parse_simpleapi_html.bzl
 
 ### Added
-* Nothing yet
+* (gazelle): Added `python_resolve_pytest_fixture` gazelle directive to resolve
+  a pytest fixture use to a target label.
 
 ### Removed
 * Nothing yet
