@@ -234,15 +234,15 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 	collisionErrors := singlylinkedlist.New()
 
 	appendPyLibrary := func(srcs *treeset.Set, pyLibraryTargetName string) {
-		allDeps, mainModules, annotations, err := parser.parse(srcs)
+		parseRes, err := parser.parse(srcs)
 		if err != nil {
 			log.Fatalf("ERROR: %v\n", err)
 		}
 
 		if !hasPyBinaryEntryPointFile {
 			// Creating one py_binary target per main module when __main__.py doesn't exist.
-			mainFileNames := make([]string, 0, len(mainModules))
-			for name := range mainModules {
+			mainFileNames := make([]string, 0, len(parseRes.mainModules))
+			for name := range parseRes.mainModules {
 				mainFileNames = append(mainFileNames, name)
 
 				// Remove the file from srcs if we're doing per-file library generation so
@@ -263,8 +263,8 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 				pyBinary := newTargetBuilder(pyBinaryKind, pyBinaryTargetName, pythonProjectRoot, args.Rel, pyFileNames).
 					addVisibility(visibility).
 					addSrc(filename).
-					addModuleDependencies(mainModules[filename]).
-					addResolvedDependencies(annotations.includeDeps).
+					addModuleDependencies(parseRes.mainModules[filename]).
+					addResolvedDependencies(parseRes.annotations.includeDeps).
 					generateImportsAttribute().build()
 				result.Gen = append(result.Gen, pyBinary)
 				result.Imports = append(result.Imports, pyBinary.PrivateAttr(config.GazelleImportsKey))
@@ -303,8 +303,8 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 		pyLibrary := newTargetBuilder(pyLibraryKind, pyLibraryTargetName, pythonProjectRoot, args.Rel, pyFileNames).
 			addVisibility(visibility).
 			addSrcs(srcs).
-			addModuleDependencies(allDeps).
-			addResolvedDependencies(annotations.includeDeps).
+			addModuleDependencies(parseRes.moduleDeps).
+			addResolvedDependencies(parseRes.annotations.includeDeps).
 			generateImportsAttribute().
 			build()
 
@@ -333,7 +333,7 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 	}
 
 	if hasPyBinaryEntryPointFile {
-		deps, _, annotations, err := parser.parseSingle(pyBinaryEntrypointFilename)
+		parseRes, err := parser.parseSingle(pyBinaryEntrypointFilename)
 		if err != nil {
 			log.Fatalf("ERROR: %v\n", err)
 		}
@@ -356,8 +356,8 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 			setMain(pyBinaryEntrypointFilename).
 			addVisibility(visibility).
 			addSrc(pyBinaryEntrypointFilename).
-			addModuleDependencies(deps).
-			addResolvedDependencies(annotations.includeDeps).
+			addModuleDependencies(parseRes.moduleDeps).
+			addResolvedDependencies(parseRes.annotations.includeDeps).
 			generateImportsAttribute()
 
 		pyBinary := pyBinaryTarget.build()
@@ -368,7 +368,7 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 
 	var conftest *rule.Rule
 	if hasConftestFile {
-		deps, _, annotations, err := parser.parseSingle(conftestFilename)
+		parseRes, err := parser.parseSingle(conftestFilename)
 		if err != nil {
 			log.Fatalf("ERROR: %v\n", err)
 		}
@@ -386,8 +386,8 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 
 		conftestTarget := newTargetBuilder(pyLibraryKind, conftestTargetname, pythonProjectRoot, args.Rel, pyFileNames).
 			addSrc(conftestFilename).
-			addModuleDependencies(deps).
-			addResolvedDependencies(annotations.includeDeps).
+			addModuleDependencies(parseRes.moduleDeps).
+			addResolvedDependencies(parseRes.annotations.includeDeps).
 			addVisibility(visibility).
 			setTestonly().
 			generateImportsAttribute()
@@ -400,7 +400,7 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 
 	var pyTestTargets []*targetBuilder
 	newPyTestTargetBuilder := func(srcs *treeset.Set, pyTestTargetName string) *targetBuilder {
-		deps, _, annotations, err := parser.parse(srcs)
+		parseRes, err := parser.parse(srcs)
 		if err != nil {
 			log.Fatalf("ERROR: %v\n", err)
 		}
@@ -417,8 +417,8 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 		}
 		return newTargetBuilder(pyTestKind, pyTestTargetName, pythonProjectRoot, args.Rel, pyFileNames).
 			addSrcs(srcs).
-			addModuleDependencies(deps).
-			addResolvedDependencies(annotations.includeDeps).
+			addModuleDependencies(parseRes.moduleDeps).
+			addResolvedDependencies(parseRes.annotations.includeDeps).
 			generateImportsAttribute()
 	}
 	if (!cfg.PerPackageGenerationRequireTestEntryPoint() || hasPyTestEntryPointFile || hasPyTestEntryPointTarget || cfg.CoarseGrainedGeneration()) && !cfg.PerFileGeneration() {

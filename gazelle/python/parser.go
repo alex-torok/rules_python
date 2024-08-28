@@ -37,6 +37,15 @@ type python3Parser struct {
 	ignoresDependency func(dep string) bool
 }
 
+type parseResult struct {
+	// The set of module dependencies extracted from the import statements.
+	moduleDeps  *treeset.Set
+	// Mapping of source files with main function to their module dependencies.
+	mainModules map[string]*treeset.Set
+	// The annotations parsed from the comments of the Python sources.
+	annotations *annotations
+}
+
 // newPython3Parser constructs a new python3Parser.
 func newPython3Parser(
 	repoRoot string,
@@ -52,7 +61,7 @@ func newPython3Parser(
 
 // parseSingle parses a single Python file and returns the extracted modules
 // from the import statements as well as the parsed comments.
-func (p *python3Parser) parseSingle(pyFilename string) (*treeset.Set, map[string]*treeset.Set, *annotations, error) {
+func (p *python3Parser) parseSingle(pyFilename string) (parseResult, error) {
 	pyFilenames := treeset.NewWith(godsutils.StringComparator)
 	pyFilenames.Add(pyFilename)
 	return p.parse(pyFilenames)
@@ -60,7 +69,7 @@ func (p *python3Parser) parseSingle(pyFilename string) (*treeset.Set, map[string
 
 // parse parses multiple Python files and returns the extracted modules from
 // the import statements as well as the parsed comments.
-func (p *python3Parser) parse(pyFilenames *treeset.Set) (*treeset.Set, map[string]*treeset.Set, *annotations, error) {
+func (p *python3Parser) parse(pyFilenames *treeset.Set) (parseResult, error) {
 	modules := treeset.NewWith(moduleComparator)
 
 	g, ctx := errgroup.WithContext(context.Background())
@@ -83,7 +92,7 @@ func (p *python3Parser) parse(pyFilenames *treeset.Set) (*treeset.Set, map[strin
 		}(v.(string)))
 	}
 	if err := g.Wait(); err != nil {
-		return nil, nil, nil, err
+		return parseResult{}, err
 	}
 	close(ch)
 	close(chRes)
@@ -96,7 +105,7 @@ func (p *python3Parser) parse(pyFilenames *treeset.Set) (*treeset.Set, map[strin
 		}
 		annotations, err := annotationsFromComments(res.Comments)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse annotations: %w", err)
+			return parseResult{}, fmt.Errorf("failed to parse annotations: %w", err)
 		}
 
 		for _, m := range res.Modules {
@@ -127,7 +136,10 @@ func (p *python3Parser) parse(pyFilenames *treeset.Set) (*treeset.Set, map[strin
 
 	allAnnotations.includeDeps = removeDupesFromStringTreeSetSlice(allAnnotations.includeDeps)
 
-	return modules, mainModules, allAnnotations, nil
+	return parseResult{
+		moduleDeps:  modules,
+		mainModules: mainModules,
+		annotations: allAnnotations}, nil
 }
 
 // removeDupesFromStringTreeSetSlice takes a []string, makes a set out of the
