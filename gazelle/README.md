@@ -210,6 +210,8 @@ Python-specific directives are as follows:
 | Defines the format of the distribution name in labels to third-party deps. Useful for using Gazelle plugin with other rules with different repository conventions (e.g. `rules_pycross`). Full label is always prepended with (pip) repository name, e.g. `@pip//numpy`.                        |
 | `# gazelle:python_label_normalization`                                                                                                                                                                                                                                                          | `snake_case` |
 | Controls how distribution names in labels to third-party deps are normalized. Useful for using Gazelle plugin with other rules with different label conventions (e.g. `rules_pycross` uses PEP-503). Can be "snake_case", "none", or "pep503".                                                  |
+| [`# gazelle:python_resolve_pytest_fixture`](#directive-python_resolve_pytest_fixture)                                                                                                                                                                                                           | n/a |
+| Add a target label resolve for a pytest fixture. Value should be of the form `fixture_name //target:label`                                                                                                                                                                                      | |
 
 #### Directive: `python_root`:
 
@@ -467,6 +469,42 @@ def py_test(name, main=None, **kwargs):
         main = main,
         deps = deps,
         **kwargs,
+)
+```
+
+#### Directive: `python_resolve_pytest_fixture`:
+In pytest, fixtures are method parameters that are automatically discovered and injected into test functions by pytest's plugin machinery.
+
+You can use this directive to add a target label resolve for a pytest fixture. The value should be of the form `fixture_name //target:label`.
+
+For example, the following python code depends on two fixtures: `mocker` and `other_fixture`:
+
+```python
+import pytest
+
+@pytest.fixture
+def local_fixture(other_fixture):
+    return 42
+
+def test_foo(mocker, local_fixture):
+    pass
+```
+
+Using the following BUILD file directives, these fixture dependencies can be resolved:
+```starlark
+# gazelle:python_resolve_pytest_fixture mocker @pip//pytest_mock
+# gazelle:python_resolve_pytest_fixture other_fixture //some/other:target
+```
+
+This will generate the following BUILD file target:
+```starlark
+py_test(
+    name = "test_foo",
+    srcs = ["test_foo.py"],
+    deps = [
+        "@pip//pytest_mock",
+        "//some/other:target",
+    ],
 )
 ```
 
