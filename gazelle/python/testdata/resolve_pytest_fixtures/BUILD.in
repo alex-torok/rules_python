@@ -1,0 +1,5 @@
+load("@rules_python//python:defs.bzl", "py_library")
+
+# gazelle:python_resolve_pytest_fixture mocker @pip//pytest_mock
+# gazelle:python_resolve_pytest_fixture foo_fixture //:resolve_pytest_fixtures
+# gazelle:resolve py pytest @pip//pytest

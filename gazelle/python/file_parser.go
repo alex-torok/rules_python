@@ -36,13 +36,16 @@ const (
 	sitterNodeTypeImportStatement     = "import_statement"
 	sitterNodeTypeComparisonOperator  = "comparison_operator"
 	sitterNodeTypeImportFromStatement = "import_from_statement"
+	sitterNodeTypeFunctionDefinition  = "function_definition"
+	sitterNodeTypeDecorator           = "decorator"
 )
 
 type ParserOutput struct {
-	FileName string
-	Modules  []module
-	Comments []comment
-	HasMain  bool
+	FileName       string
+	Modules        []module
+	Comments       []comment
+	HasMain        bool
+	PytestFixtures []pytestFixtureUse
 }
 
 type FileParser struct {
@@ -154,6 +157,55 @@ func (p *FileParser) parseComments(node *sitter.Node) bool {
 	return false
 }
 
+func (p *FileParser) parsePytestFixtures(node *sitter.Node) bool {
+	if node.Type() == sitterNodeTypeFunctionDefinition {
+		functionName := node.Child(1).Content(p.code)
+		if strings.HasPrefix(functionName, "test_") {
+			p.parseOneFixtureFunc(node)
+			return true
+		}
+	} else if node.Type() == sitterNodeTypeDecorator {
+		child := node.Child(1)
+		var decoratorName string
+		if child.Type() == "attribute" {
+			decoratorName = child.Content(p.code)
+		} else if child.Type() == "call" {
+			// decorator is a call function. We need to get its name from the first child.
+			decoratorName = child.Child(0).Content(p.code)
+		} else {
+			// unknown decorator type
+			return false
+		}
+		if decoratorName == "pytest.fixture" {
+			funcNode := node.NextSibling()
+			p.parseOneFixtureFunc(funcNode)
+			return true
+		}
+	}
+	return false
+}
+
+func (p *FileParser) parseOneFixtureFunc(node *sitter.Node) {
+	functionName := node.Child(1).Content(p.code)
+	parameters := node.Child(2)
+	for i := 0; i < int(parameters.NamedChildCount()); i++ {
+		param := parameters.NamedChild(i)
+		// In python, kwargs show up as nodes of type "default_parameter".
+		// Pytest does not consider arugments with default values as targets for
+		// fixtures or parameterization.
+		// See: https://github.com/pytest-dev/pytest/issues/3221#issuecomment-365890045
+		if param.Type() == "identifier" {
+			p.output.PytestFixtures = append(p.output.PytestFixtures,
+				pytestFixtureUse{
+					Name:         param.Content(p.code),
+					Filepath:     p.relFilepath,
+					FunctionName: functionName,
+					LineNumber:   param.StartPoint().Row + 1,
+				})
+		}
+	}
+}
+
 func (p *FileParser) SetCodeAndFile(code []byte, relPackagePath, filename string) {
 	p.code = code
 	p.relFilepath = filepath.Join(relPackagePath, filename)
@@ -173,6 +225,9 @@ func (p *FileParser) parse(ctx context.Context, node *sitter.Node) {
 			continue
 		}
 		if p.parseComments(child) {
+			continue
+		}
+		if p.parsePytestFixtures(child) {
 			continue
 		}
 		p.parse(ctx, child)

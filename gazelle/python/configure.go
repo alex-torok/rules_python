@@ -70,6 +70,7 @@ func (py *Configurer) KnownDirectives() []string {
 		pythonconfig.TestFilePattern,
 		pythonconfig.LabelConvention,
 		pythonconfig.LabelNormalization,
+		pythonconfig.ResolvePytestFixture,
 	}
 }
 
@@ -224,6 +225,12 @@ func (py *Configurer) Configure(c *config.Config, rel string, f *rule.File) {
 			default:
 				config.SetLabelNormalization(pythonconfig.DefaultLabelNormalizationType)
 			}
+		case pythonconfig.ResolvePytestFixture:
+			fields := strings.Fields(d.Value)
+			if len(fields) != 2 {
+				log.Fatalf("directive %q requires exactly two arguments: fixture_name target_label", pythonconfig.ResolvePytestFixture)
+			}
+			config.AddPytestFixtureResolve(fields[0], fields[1])
 		}
 	}
 

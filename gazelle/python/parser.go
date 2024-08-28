@@ -39,11 +39,13 @@ type python3Parser struct {
 
 type parseResult struct {
 	// The set of module dependencies extracted from the import statements.
-	moduleDeps  *treeset.Set
+	moduleDeps *treeset.Set
 	// Mapping of source files with main function to their module dependencies.
 	mainModules map[string]*treeset.Set
 	// The annotations parsed from the comments of the Python sources.
 	annotations *annotations
+	// The set of named arguments that appear to be pytest fixtures.
+	pytestFixtures *treeset.Set
 }
 
 // newPython3Parser constructs a new python3Parser.
@@ -99,6 +101,7 @@ func (p *python3Parser) parse(pyFilenames *treeset.Set) (parseResult, error) {
 	mainModules := make(map[string]*treeset.Set, len(chRes))
 	allAnnotations := new(annotations)
 	allAnnotations.ignore = make(map[string]struct{})
+	fixtures := treeset.NewWith(pytestFixtureUseCompartor)
 	for res := range chRes {
 		if res.HasMain {
 			mainModules[res.FileName] = treeset.NewWith(moduleComparator)
@@ -127,6 +130,10 @@ func (p *python3Parser) parse(pyFilenames *treeset.Set) (parseResult, error) {
 			}
 		}
 
+		for _, m := range res.PytestFixtures {
+			fixtures.Add(m)
+		}
+
 		// Collect all annotations from each file into a single annotations struct.
 		for k, v := range annotations.ignore {
 			allAnnotations.ignore[k] = v
@@ -137,9 +144,11 @@ func (p *python3Parser) parse(pyFilenames *treeset.Set) (parseResult, error) {
 	allAnnotations.includeDeps = removeDupesFromStringTreeSetSlice(allAnnotations.includeDeps)
 
 	return parseResult{
-		moduleDeps:  modules,
-		mainModules: mainModules,
-		annotations: allAnnotations}, nil
+		moduleDeps:     modules,
+		mainModules:    mainModules,
+		annotations:    allAnnotations,
+		pytestFixtures: fixtures,
+	}, nil
 }
 
 // removeDupesFromStringTreeSetSlice takes a []string, makes a set out of the
@@ -170,6 +179,22 @@ type module struct {
 	// If this was a from import, e.g. from foo import bar, From indicates the module
 	// from which it is imported.
 	From string `json:"from"`
+}
+
+type pytestFixtureUse struct {
+	// The name of the pytest fixture that was requested.
+	Name string
+	// The line number where the import happened.
+	LineNumber uint32 `json:"lineno"`
+	// The path to the module file relative to the Bazel workspace root.
+	Filepath string `json:"filepath"`
+	// Function name where the fixture was used.
+	FunctionName string
+}
+
+// pytestFixtureUseCompartor compares modules by name.
+func pytestFixtureUseCompartor(a, b interface{}) int {
+	return godsutils.StringComparator(a.(pytestFixtureUse).Name, b.(pytestFixtureUse).Name)
 }
 
 // moduleComparator compares modules by name.

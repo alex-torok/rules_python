@@ -1,0 +1,37 @@
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+
+# gazelle:python_resolve_pytest_fixture mocker @pip//pytest_mock
+# gazelle:python_resolve_pytest_fixture foo_fixture //:resolve_pytest_fixtures
+# gazelle:resolve py pytest @pip//pytest
+
+py_library(
+    name = "resolve_pytest_fixtures",
+    srcs = [
+        "__init__.py",
+        "foo.py",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = ["@pip//pytest"],
+)
+
+py_library(
+    name = "conftest",
+    testonly = True,
+    srcs = ["conftest.py"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@pip//pytest",
+        "@pip//pytest_mock",
+    ],
+)
+
+py_test(
+    name = "resolve_pytest_fixtures_test",
+    srcs = ["__test__.py"],
+    main = "__test__.py",
+    deps = [
+        ":conftest",
+        ":resolve_pytest_fixtures",
+        "@pip//pytest_mock",
+    ],
+)

@@ -265,6 +265,7 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 					addSrc(filename).
 					addModuleDependencies(parseRes.mainModules[filename]).
 					addResolvedDependencies(parseRes.annotations.includeDeps).
+					addPytestFixtures(parseRes.pytestFixtures).
 					generateImportsAttribute().build()
 				result.Gen = append(result.Gen, pyBinary)
 				result.Imports = append(result.Imports, pyBinary.PrivateAttr(config.GazelleImportsKey))
@@ -306,6 +307,7 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 			addModuleDependencies(parseRes.moduleDeps).
 			addResolvedDependencies(parseRes.annotations.includeDeps).
 			generateImportsAttribute().
+			addPytestFixtures(parseRes.pytestFixtures).
 			build()
 
 		if pyLibrary.IsEmpty(py.Kinds()[pyLibrary.Kind()]) {
@@ -388,6 +390,7 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 			addSrc(conftestFilename).
 			addModuleDependencies(parseRes.moduleDeps).
 			addResolvedDependencies(parseRes.annotations.includeDeps).
+			addPytestFixtures(parseRes.pytestFixtures).
 			addVisibility(visibility).
 			setTestonly().
 			generateImportsAttribute()
@@ -419,6 +422,7 @@ func (py *Python) GenerateRules(args language.GenerateArgs) language.GenerateRes
 			addSrcs(srcs).
 			addModuleDependencies(parseRes.moduleDeps).
 			addResolvedDependencies(parseRes.annotations.includeDeps).
+			addPytestFixtures(parseRes.pytestFixtures).
 			generateImportsAttribute()
 	}
 	if (!cfg.PerPackageGenerationRequireTestEntryPoint() || hasPyTestEntryPointFile || hasPyTestEntryPointTarget || cfg.CoarseGrainedGeneration()) && !cfg.PerFileGeneration() {

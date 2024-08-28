@@ -254,3 +254,92 @@ func TestParseFull(t *testing.T) {
 		FileName: "a.py",
 	}, *output)
 }
+
+func TestParsePytestFixtures(t *testing.T) {
+	t.Parallel()
+	units := []struct {
+		name     string
+		code     string
+		filename string
+		fixtures []pytestFixtureUse
+	}{
+		{
+			name:     "no fixtures",
+			code:     "a = 1\nb = 2",
+			fixtures: nil,
+		},
+		{
+			name:     "no fixtures",
+			code:     "def my_func(mocker):\n  pass",
+			fixtures: nil,
+		},
+		{
+			name:     "has mocker fixture",
+			code:     "def test_foo(mocker):\n  pass",
+			filename: "foo.py",
+			fixtures: []pytestFixtureUse{{
+				Name:         "mocker",
+				Filepath:     "foo.py",
+				LineNumber:   1,
+				FunctionName: "test_foo",
+			}},
+		},
+		{
+			name: "multiple fixtures",
+			code: "def test_foo(mocker, blank_dir):\n  pass\n\ndef test_bar(foo):\n    pass",
+			fixtures: []pytestFixtureUse{
+				{
+					Name:         "mocker",
+					LineNumber:   1,
+					FunctionName: "test_foo",
+				},
+				{
+					Name:         "blank_dir",
+					LineNumber:   1,
+					FunctionName: "test_foo",
+				},
+				{
+					Name:         "foo",
+					LineNumber:   4,
+					FunctionName: "test_bar",
+				}},
+		},
+		{
+			name: "default values are ignored",
+			code: "def test_with_default(mocker, blank_dir=None):\n  pass",
+			fixtures: []pytestFixtureUse{{
+				Name:         "mocker",
+				LineNumber:   1,
+				FunctionName: "test_with_default",
+			}},
+		},
+		{
+			name: "fixtures that depend on fixtures",
+			code: "@pytest.fixture\ndef my_func(mocker):\n  pass",
+			fixtures: []pytestFixtureUse{{
+				Name:         "mocker",
+				LineNumber:   2,
+				FunctionName: "my_func",
+			}},
+		},
+		{
+			name: "scoped fixtures that depend on fixtures",
+			code: "@pytest.fixture(scope=\"session\")\ndef my_func(mocker):\n  pass",
+			fixtures: []pytestFixtureUse{{
+				Name:         "mocker",
+				LineNumber:   2,
+				FunctionName: "my_func",
+			}},
+		},
+	}
+	for _, u := range units {
+		t.Run(u.name, func(t *testing.T) {
+			p := NewFileParser()
+			code := []byte(u.code)
+			p.SetCodeAndFile(code, "", u.filename)
+			output, err := p.Parse(context.Background())
+			assert.NoError(t, err)
+			assert.Equal(t, u.fixtures, output.PytestFixtures)
+		})
+	}
+}

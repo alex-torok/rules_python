@@ -89,6 +89,8 @@ const (
 	// names of labels to third-party dependencies are normalized. Supported values
 	// are 'none', 'pep503' and 'snake_case' (default). See LabelNormalizationType.
 	LabelNormalization = "python_label_normalization"
+	// ResolvePytestFixture is a directive that adds a pytest fixture resolve mapping.
+	ResolvePytestFixture = "python_resolve_pytest_fixture"
 )
 
 // GenerationModeType represents one of the generation modes for the Python
@@ -168,6 +170,7 @@ type Config struct {
 	testFilePattern                           []string
 	labelConvention                           string
 	labelNormalization                        LabelNormalizationType
+	pytestFixtureResolves                     map[string]string
 }
 
 type LabelNormalizationType int
@@ -203,6 +206,7 @@ func New(
 		testFilePattern:                           strings.Split(DefaultTestFilePatternString, ","),
 		labelConvention:                           DefaultLabelConvention,
 		labelNormalization:                        DefaultLabelNormalizationType,
+		pytestFixtureResolves:                     make(map[string]string),
 	}
 }
 
@@ -235,6 +239,7 @@ func (c *Config) NewChild() *Config {
 		testFilePattern:                           c.testFilePattern,
 		labelConvention:                           c.labelConvention,
 		labelNormalization:                        c.labelNormalization,
+		pytestFixtureResolves:                     c.pytestFixtureResolves,
 	}
 }
 
@@ -242,6 +247,11 @@ func (c *Config) NewChild() *Config {
 // gazelle:exclude directive.
 func (c *Config) AddExcludedPattern(pattern string) {
 	c.excludedPatterns.Add(pattern)
+}
+
+// AddPytestFixtureResolve adds a mapping from a pytest fixture to a target.
+func (c *Config) AddPytestFixtureResolve(fixture string, target string) {
+	c.pytestFixtureResolves[fixture] = target
 }
 
 // ExcludedPatterns returns the excluded patterns list.
@@ -303,6 +313,12 @@ func (c *Config) FindThirdPartyDependency(modName string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// FindPytestFixtureResolve finds the target for a given pytest fixture.
+func (c *Config) FindPytestFixtureResolve(fixture string) (string, bool) {
+	res, ok := c.pytestFixtureResolves[fixture]
+	return res, ok
 }
 
 // AddIgnoreFile adds a file to the list of ignored files for a given package.
