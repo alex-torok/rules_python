@@ -79,12 +79,9 @@ func (py *Resolver) Imports(c *config.Config, r *rule.Rule, f *rule.File) []reso
 	return provides
 }
 
-// importSpecFromSrc determines the ImportSpec based on the target that contains the src so that
-// the target can be indexed for import statements that match the calculated src relative to the its
-// Python project root.
-func importSpecFromSrc(pythonProjectRoot, bzlPkg, src string) resolve.ImportSpec {
-	pythonPkgDir := filepath.Join(bzlPkg, filepath.Dir(src))
-	relPythonPkgDir, err := filepath.Rel(pythonProjectRoot, pythonPkgDir)
+// pythonPkgForBzlPkg
+func pythonPkgForBzlPkg(pythonProjectRoot, bzlPkg string) string {
+	relPythonPkgDir, err := filepath.Rel(pythonProjectRoot, bzlPkg)
 	if err != nil {
 		panic(fmt.Errorf("unexpected failure: %v", err))
 	}
@@ -92,6 +89,15 @@ func importSpecFromSrc(pythonProjectRoot, bzlPkg, src string) resolve.ImportSpec
 		relPythonPkgDir = ""
 	}
 	pythonPkg := strings.ReplaceAll(relPythonPkgDir, "/", ".")
+	return pythonPkg
+}
+
+// importSpecFromSrc determines the ImportSpec based on the target that contains the src so that
+// the target can be indexed for import statements that match the calculated src relative to the its
+// Python project root.
+func importSpecFromSrc(pythonProjectRoot, bzlPkg, src string) resolve.ImportSpec {
+	srcDir := filepath.Join(bzlPkg, filepath.Dir(src))
+	pythonPkg := pythonPkgForBzlPkg(pythonProjectRoot, srcDir)
 	filename := filepath.Base(src)
 	if filename == pyLibraryEntrypointFilename {
 		if pythonPkg != "" {
@@ -152,8 +158,28 @@ func (py *Resolver) Resolve(
 	MODULES_LOOP:
 		for it.Next() {
 			mod := it.Value().(module)
-			moduleParts := strings.Split(mod.Name, ".")
-			possibleModules := []string{mod.Name}
+			fullModulePath := mod.Name
+
+			// If this is a relative import, reconstruct the full module path to the directory where
+			// the import happened.
+			if strings.HasPrefix(mod.Name, ".") {
+				relativePath := filepath.Dir(mod.Filepath)
+				// Skip the first dot, as that specifies the current directory
+				// We want to go up one directory for each dot after the first one.
+				moduleName := mod.Name[1:]
+				for moduleName[0] == '.' {
+					relativePath += "/.."
+					moduleName = moduleName[1:]
+				}
+				pythonPkg := pythonPkgForBzlPkg(pythonProjectRoot, relativePath)
+				if pythonPkg != "" {
+					pythonPkg += "."
+				}
+				fullModulePath = fmt.Sprintf("%s%s", pythonPkg, moduleName)
+			}
+
+			moduleParts := strings.Split(fullModulePath, ".")
+			possibleModules := []string{fullModulePath}
 			for len(moduleParts) > 1 {
 				// Iterate back through the possible imports until
 				// a match is found.

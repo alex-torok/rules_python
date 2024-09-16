@@ -20,7 +20,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/smacker/go-tree-sitter/python"
@@ -152,22 +151,16 @@ func parseImportStatement(node *sitter.Node, code []byte) (module, bool) {
 // import represents.
 func (p *FileParser) parseImportStatements(node *sitter.Node) bool {
 	if node.Type() == sitterNodeTypeImportStatement {
-		for j := 1; j < int(node.ChildCount()); j++ {
+		for j := 0; j < int(node.ChildCount()); j++ {
 			m, ok := parseImportStatement(node.Child(j), p.code)
 			if !ok {
 				continue
 			}
 			m.Filepath = p.relFilepath
-			if strings.HasPrefix(m.Name, ".") {
-				continue
-			}
 			p.output.Modules = append(p.output.Modules, m)
 		}
 	} else if node.Type() == sitterNodeTypeImportFromStatement {
 		from := node.Child(1).Content(p.code)
-		if strings.HasPrefix(from, ".") {
-			return true
-		}
 		for j := 3; j < int(node.ChildCount()); j++ {
 			m, ok := parseImportStatement(node.Child(j), p.code)
 			if !ok {
@@ -175,7 +168,13 @@ func (p *FileParser) parseImportStatements(node *sitter.Node) bool {
 			}
 			m.Filepath = p.relFilepath
 			m.From = from
-			m.Name = fmt.Sprintf("%s.%s", from, m.Name)
+			var fromPrefix string
+			if from == "." {
+				fromPrefix = "."
+			} else {
+				fromPrefix = fmt.Sprintf("%s.", from)
+			}
+			m.Name = fmt.Sprintf("%s%s", fromPrefix, m.Name)
 			p.output.Modules = append(p.output.Modules, m)
 		}
 	} else {

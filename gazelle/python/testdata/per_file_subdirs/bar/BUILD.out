@@ -6,6 +6,7 @@ py_library(
     name = "__init__",
     srcs = ["__init__.py"],
     visibility = ["//:__subpackages__"],
+    deps = [":foo"],
 )
 
 py_library(
@@ -15,6 +16,7 @@ py_library(
         "bar.py",
     ],
     visibility = ["//:__subpackages__"],
+    deps = [":foo"],
 )
 
 py_library(

@@ -132,6 +132,33 @@ func TestParseImportStatements(t *testing.T) {
 					LineNumber: 2,
 					From:       "foo",
 				},
+				{
+					Name:       ".abc",
+					LineNumber: 3,
+					From:       ".",
+				},
+			},
+		},
+		{
+			name: "relative from import",
+			code: "from .foo import bar",
+			result: []module{
+				{
+					Name:       ".foo.bar",
+					LineNumber: 1,
+					From:       ".foo",
+				},
+			},
+		},
+		{
+			name: "double relative from import",
+			code: "from ..foo import bar",
+			result: []module{
+				{
+					Name:       "..foo.bar",
+					LineNumber: 1,
+					From:       "..foo",
+				},
 			},
 		},
 	}
